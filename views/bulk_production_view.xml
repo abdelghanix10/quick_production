@@ -2,73 +2,100 @@
 <odoo>
 
     <!-- List View -->
-    <record id="view_bakery_production_list_tree" model="ir.ui.view">
-        <field name="name">bakery.production.list.tree</field>
-        <field name="model">bakery.production.list</field>
+    <record id="view_quick_production_list_tree" model="ir.ui.view">
+        <field name="name">quick.production.list.tree</field>
+        <field name="model">quick.production.list</field>
         <field name="arch" type="xml">
             <list string="Pending Production" editable="bottom" create="0" delete="0">
                 <header>
-                    <button name="action_produce_selected" string="Produce Selected" type="object" class="btn-primary"/>
+                    <button name="action_produce_selected"
+                            string="Produce Selected"
+                            type="object"
+                            class="btn-primary"/>
+                    <button name="action_fill_planned_qty"
+                            string="Fill Planned Quantities"
+                            type="object"
+                            class="btn-secondary"/>
                 </header>
                 <field name="mo_id"/>
                 <field name="product_id"/>
+                <field name="date_start" optional="show"/>
                 <field name="qty_producing" string="Quantity"/>
-                <field name="qty_total_str" string=" "/>
-                <button name="action_edit_qty" string="Edit" type="object" icon="fa-pencil" class="btn-secondary" invisible="state in ('done', 'cancel')"/>
-                <field name="state" widget="badge" decoration-info="state == 'confirmed'" decoration-warning="state == 'progress'"/>
-                <button name="action_produce_line" string="Done" type="object" icon="fa-check" class="btn-success" invisible="state in ('done', 'cancel')"/>
-                <button name="action_cancel" string="Cancel" type="object" icon="fa-times" class="btn-danger" invisible="state in ('done', 'cancel')"/>
+                <field name="qty_total_str" string="Planned"/>
+                <button name="action_edit_qty"
+                        string="Edit"
+                        type="object"
+                        icon="edit"
+                        class="btn-secondary"
+                        invisible="state in ('done', 'cancel')"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'confirmed'"
+                       decoration-warning="state in ('progress', 'to_close')"/>
+                <button name="action_produce_line"
+                        string="Done"
+                        type="object"
+                        icon="check"
+                        class="btn-success"
+                        invisible="state in ('done', 'cancel')"/>
+                <button name="action_cancel"
+                        string="Cancel"
+                        type="object"
+                        icon="close"
+                        class="btn-danger"
+                        confirm="Are you sure you want to cancel this Manufacturing Order?"
+                        invisible="state in ('done', 'cancel')"/>
             </list>
         </field>
     </record>
 
-    <!-- Server Action to Populate and Open -->
-    <record id="action_open_bulk_production_v4" model="ir.actions.server">
+    <!-- Server Action to Populate and Open (Scoped per User) -->
+    <record id="action_open_bulk_production" model="ir.actions.server">
         <field name="name">Produce All</field>
-        <field name="model_id" ref="model_bakery_production_list"/>
+        <field name="model_id" ref="model_quick_production_list"/>
         <field name="state">code</field>
         <field name="code">
-# Clear existing
-env['bakery.production.list'].search([]).unlink()
+# Clear only current user's transient rows to prevent multi-user collisions
+env['quick.production.list'].search([('create_uid', '=', env.uid)]).unlink()
 
 if env.user.has_group('base.group_system'):
     domain = [('state', 'not in', ['done', 'cancel'])]
 else:
-    if not env.user.production_category_id:
+    categ_ids = env.user._get_allowed_production_category_ids()
+    if not categ_ids:
         domain = [('id', '=', False)]
     else:
         domain = [
             ('state', 'not in', ['done', 'cancel']),
-            ('product_id.categ_id', 'child_of', env.user.production_category_id.id),
-            ('user_id', '=', env.user.id)
+            ('product_id.categ_id', 'child_of', categ_ids),
+            ('user_id', '=', env.user.id),
         ]
 
-mos = env['mrp.production'].sudo().search(domain)
+mos = env['mrp.production'].sudo().search(domain, order='date_start asc, id asc')
 
-# Create lines
 for mo in mos:
-    env['bakery.production.list'].create({
+    env['quick.production.list'].create({
         'mo_id': mo.id,
-        'qty_producing': mo.qty_producing,
+        'qty_producing': mo.qty_producing or mo.product_qty,
     })
 
-# Return Action
 action = {
     'type': 'ir.actions.act_window',
-    'name': 'Produce All',
-    'res_model': 'bakery.production.list',
+    'name': 'Pending Production (Produce All)',
+    'res_model': 'quick.production.list',
     'view_mode': 'list',
-    'view_id': env.ref('bakery_quick_production.view_bakery_production_list_tree').id,
+    'view_id': env.ref('quick_production.view_quick_production_list_tree').id,
+    'domain': [('create_uid', '=', env.uid)],
     'target': 'current',
 }
         </field>
     </record>
 
-    <!-- Menu Item (Next to Dashboard) -->
-    <menuitem id="menu_bakery_production_bulk"
+    <!-- Menu Item -->
+    <menuitem id="menu_quick_production_bulk"
               name="Produce All"
-              parent="menu_bakery_production_root"
-              action="action_open_bulk_production_v4"
+              parent="menu_quick_production_root"
+              action="action_open_bulk_production"
               sequence="2"/>
 
 </odoo>

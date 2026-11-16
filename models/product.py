@@ -1,15 +1,16 @@
-from odoo import models, fields, api
+from odoo import models, _
+
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
 
-    def action_open_bakery_wizard(self):
-        """ Opens the Bakery Production Wizard for this product. """
+    def action_open_quick_production_wizard(self):
+        """Opens the Quick Production Wizard for this product."""
         self.ensure_one()
         return {
-            'name': 'Register Production',
+            'name': _('Register Production: %s', self.display_name),
             'type': 'ir.actions.act_window',
-            'res_model': 'bakery.production.wizard',
+            'res_model': 'quick.production.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_product_id': self.id},

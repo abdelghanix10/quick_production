@@ -1,30 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Custom Kanban View for Product -->
-    <record id="view_product_bakery_kanban" model="ir.ui.view">
-        <field name="name">product.product.bakery.kanban</field>
+    <!-- Custom Kiosk Kanban View for Product -->
+    <record id="view_product_quick_production_kanban" model="ir.ui.view">
+        <field name="name">product.product.quick.production.kanban</field>
         <field name="model">product.product</field>
         <field name="arch" type="xml">
-            <kanban create="false" action="action_open_bakery_wizard" type="object">
+            <kanban create="false" action="action_open_quick_production_wizard" type="object">
                 <field name="id"/>
                 <field name="name"/>
-                <field name="image_128"/>
+                <field name="qty_available"/>
+                <field name="uom_id"/>
+                <field name="categ_id"/>
                 <templates>
                     <t t-name="card">
-                        <!-- Card: image left (centered), title right, with gap -->
-                        <div class="oe_kanban_global_click d-flex flex-row align-items-center"
-                             style="padding: 8px; gap: 14px; min-height: 72px; flex: 0 0 calc(100% / 6);">
-                            <div class="d-flex align-items-center justify-content-center"
-                                 style="width: 56px; height: 56px; flex: 0 0 56px;">
+                        <div class="oe_kanban_global_click d-flex flex-row align-items-center p-2"
+                             style="gap: 14px; min-height: 76px;">
+                            <div class="d-flex align-items-center justify-content-center rounded border bg-white"
+                                 style="width: 58px; height: 58px; flex: 0 0 58px;">
                                 <img t-attf-src="/web/image/product.product/{{record.id.raw_value}}/image_128"
                                      alt="Product"
                                      style="width: 100%; height: 100%; object-fit: contain; display: block;"/>
                             </div>
                             <div style="flex: 1 1 auto; min-width: 0;">
-                                <strong style="display: block; font-size: 1.15rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <strong class="d-block text-truncate" style="font-size: 1.1rem; line-height: 1.3;">
                                     <field name="name"/>
                                 </strong>
+                                <div class="text-muted small d-flex align-items-center gap-2 mt-1">
+                                    <span>Stock: <strong><field name="qty_available"/> <field name="uom_id"/></strong></span>
+                                </div>
                             </div>
                         </div>
                     </t>
@@ -33,49 +37,66 @@
         </field>
     </record>
 
-    <!-- Action -->
-    <record id="action_bakery_production_dashboard_window" model="ir.actions.act_window">
-        <field name="name">Bakery Production</field>
+    <!-- Window Action -->
+    <record id="action_quick_production_dashboard_window" model="ir.actions.act_window">
+        <field name="name">Quick Production</field>
         <field name="res_model">product.product</field>
         <field name="view_mode">kanban</field>
-        <field name="view_id" ref="view_product_bakery_kanban"/>
+        <field name="view_id" ref="view_product_quick_production_kanban"/>
         <field name="domain">[]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No products found.
+                No products found for your Production Category.
             </p>
             <p>
-                Contact your system administrator to add products.
+                Ask an administrator to assign your Production Category in User Settings.
             </p>
         </field>
     </record>
 
-    <record id="action_bakery_production_dashboard_server" model="ir.actions.server">
-        <field name="name">Bakery Production Dashboard</field>
+    <!-- Server Action to Filter Dashboard by User's Allowed Categories -->
+    <record id="action_quick_production_dashboard_server" model="ir.actions.server">
+        <field name="name">Quick Production Dashboard</field>
         <field name="model_id" ref="product.model_product_product"/>
         <field name="state">code</field>
         <field name="code">
-action = env.ref('bakery_quick_production.action_bakery_production_dashboard_window').sudo().read()[0]
+action = env.ref('quick_production.action_quick_production_dashboard_window').sudo().read()[0]
 action.pop('id', None)
 if env.user.has_group('base.group_system'):
     action['domain'] = []
-elif env.user.production_category_id:
-    action['domain'] = [('categ_id', 'child_of', env.user.production_category_id.id)]
 else:
-    action['domain'] = [('id', '=', False)]
+    categ_ids = env.user._get_allowed_production_category_ids()
+    if categ_ids:
+        action['domain'] = [('categ_id', 'child_of', categ_ids)]
+    else:
+        action['domain'] = [('id', '=', False)]
         </field>
     </record>
 
-    <!-- Menu Item -->
-    <menuitem id="menu_bakery_production_root"
-              name="Bakery Production"
-              sequence="10"
-              web_icon="bakery_quick_production,static/description/icon.png"/>
+    <!-- Today's Manufacturing Orders Action -->
+    <record id="action_quick_production_today_mos" model="ir.actions.act_window">
+        <field name="name">Today's Production Orders</field>
+        <field name="res_model">mrp.production</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]</field>
+    </record>
 
-    <menuitem id="menu_bakery_production_dashboard"
+    <!-- Menu Items -->
+    <menuitem id="menu_quick_production_root"
+              name="Quick Production"
+              sequence="10"
+              web_icon="quick_production,static/description/icon.png"/>
+
+    <menuitem id="menu_quick_production_dashboard"
               name="Dashboard"
-              parent="menu_bakery_production_root"
-              action="action_bakery_production_dashboard_server"
+              parent="menu_quick_production_root"
+              action="action_quick_production_dashboard_server"
               sequence="1"/>
+
+    <menuitem id="menu_quick_production_today"
+              name="Today's Orders"
+              parent="menu_quick_production_root"
+              action="action_quick_production_today_mos"
+              sequence="3"/>
 
 </odoo>

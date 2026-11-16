@@ -1,0 +1,6 @@
+id,name,model_id,group_id/id,operation,domain
+access_quick_production_wizard,quick.production.wizard,quick.production.wizard,base.group_user,crud,
+access_quick_production_wizard_line,quick.production.wizard.line,quick.production.wizard.line,base.group_user,crud,
+access_quick_production_list,quick.production.list,quick.production.list,base.group_user,crud,
+access_quick_production_edit_wizard,quick.production.edit.wizard,quick.production.edit.wizard,base.group_user,crud,
+access_quick_production_edit_wizard_line,quick.production.edit.wizard.line,quick.production.edit.wizard.line,base.group_user,crud,

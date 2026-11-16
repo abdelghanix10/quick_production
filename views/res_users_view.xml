@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_users_form_bakery_production" model="ir.ui.view">
-        <field name="name">res.users.form.bakery.production</field>
+    <record id="view_users_form_quick_production" model="ir.ui.view">
+        <field name="name">res.users.form.quick.production</field>
         <field name="model">res.users</field>
         <field name="inherit_id" ref="base.view_users_form"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="Bakery Production">
+                <page string="Quick Production">
                     <group>
                         <field name="production_category_id"/>
+                        <field name="production_category_ids" widget="many2many_tags"/>
                     </group>
                 </page>
             </xpath>

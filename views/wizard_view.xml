@@ -1,53 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="view_bakery_production_wizard_form" model="ir.ui.view">
-        <field name="name">bakery.production.wizard.form</field>
-        <field name="model">bakery.production.wizard</field>
+    <record id="view_quick_production_wizard_form" model="ir.ui.view">
+        <field name="name">quick.production.wizard.form</field>
+        <field name="model">quick.production.wizard</field>
         <field name="arch" type="xml">
             <form string="Register Production">
                 <sheet>
+                    <field name="has_bom" invisible="1"/>
+                    <field name="has_stock_warning" invisible="1"/>
+
+                    <div class="alert alert-warning mb-3" role="alert" invisible="not has_stock_warning">
+                        <strong>Stock Warning:</strong> One or more ingredients have insufficient on-hand stock for this batch size.
+                    </div>
+
                     <group>
                         <group>
                             <field name="product_id" options="{'no_open': True}"/>
-                            <field name="qty_producing"/>
+                            <label for="qty_producing"/>
+                            <div class="o_row">
+                                <field name="qty_producing" class="fw-bold fs-4"/>
+                                <field name="uom_id" class="oe_inline"/>
+                            </div>
+                        </group>
+                        <group string="Quick Quantity Keypad">
+                            <div class="d-flex flex-wrap gap-2">
+                                <button name="action_add_1" string="+1" type="object" class="btn btn-outline-primary"/>
+                                <button name="action_add_5" string="+5" type="object" class="btn btn-outline-primary"/>
+                                <button name="action_add_10" string="+10" type="object" class="btn btn-outline-primary"/>
+                                <button name="action_add_50" string="+50" type="object" class="btn btn-outline-primary"/>
+                                <button name="action_reset_qty" string="Reset (1)" type="object" class="btn btn-outline-secondary"/>
+                            </div>
                         </group>
                     </group>
+
                     <notebook>
                         <page string="Ingredients Required">
                             <field name="ingredient_ids">
-                                <list create="0" delete="0" edit="0">
+                                <list create="0" delete="0" edit="0" decoration-danger="is_shortage">
                                     <field name="product_id"/>
                                     <field name="qty"/>
+                                    <field name="qty_available"/>
                                     <field name="uom_id"/>
+                                    <field name="is_shortage" column_invisible="1"/>
+                                    <field name="stock_status" widget="badge"
+                                           decoration-success="stock_status == 'available'"
+                                           decoration-danger="stock_status == 'shortage'"/>
                                 </list>
                             </field>
                         </page>
                     </notebook>
                 </sheet>
                 <footer>
-                    <button name="action_to_close" string="Confirm Production" type="object" class="btn-primary"/>
+                    <button name="action_confirm"
+                            string="Produce Immediately (Done)"
+                            type="object"
+                            class="btn-success"/>
+                    <button name="action_to_close"
+                            string="Queue Production (Pending)"
+                            type="object"
+                            class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
         </field>
     </record>
 
-    <record id="view_bakery_production_edit_wizard_form" model="ir.ui.view">
-        <field name="name">bakery.production.edit.wizard.form</field>
-        <field name="model">bakery.production.edit.wizard</field>
+    <record id="view_quick_production_edit_wizard_form" model="ir.ui.view">
+        <field name="name">quick.production.edit.wizard.form</field>
+        <field name="model">quick.production.edit.wizard</field>
         <field name="arch" type="xml">
             <form string="Edit Production Quantity">
                 <sheet>
                     <group>
                         <field name="mo_id" invisible="1"/>
-                        <field name="bakery_list_id" invisible="1"/>
+                        <field name="quick_list_id" invisible="1"/>
                         <field name="product_id"/>
                         <field name="current_qty" string="Planned Quantity"/>
                         <field name="new_qty" autofocus="autofocus"/>
                     </group>
                     <notebook>
-                        <page string="Ingredients Change">
+                        <page string="Updated Ingredients">
                             <field name="line_ids">
                                 <list create="0" delete="0" edit="0">
                                     <field name="product_id"/>
