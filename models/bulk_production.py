@@ -14,7 +14,8 @@ class QuickProductionList(models.TransientModel):
         ondelete='cascade',
     )
     product_id = fields.Many2one(related='mo_id.product_id', string='Product', readonly=True)
-    uom_id = fields.Many2one(related='mo_id.product_uom_id', string='UoM', readonly=True)
+    # In Odoo 20, mrp.production uses `uom_id` instead of `product_uom_id`
+    uom_id = fields.Many2one(related='mo_id.uom_id', string='UoM', readonly=True)
     date_start = fields.Datetime(related='mo_id.date_start', string='Scheduled Date', readonly=True)
     qty_producing = fields.Float(string='Quantity to Produce', default=0.0)
     state = fields.Selection(related='mo_id.state', string='State', readonly=True)
@@ -38,6 +39,46 @@ class QuickProductionList(models.TransientModel):
                     _("Quantity to produce (%(prod).2f) cannot exceed planned quantity (%(plan).2f). Use 'Edit' to increase planned quantity.",
                       prod=record.qty_producing, plan=record.qty_total)
                 )
+
+    @api.model
+    def action_open_bulk_production(self):
+        """Refresh the current user's pending production rows and return the list action."""
+        self.search([('create_uid', '=', self.env.uid)]).unlink()
+
+        if self.env.user.has_group('base.group_system'):
+            domain = [('state', 'not in', ['done', 'cancel'])]
+        else:
+            categ_ids = self.env.user._get_allowed_production_category_ids()
+            if not categ_ids:
+                domain = [('id', '=', False)]
+            else:
+                domain = [
+                    ('state', 'not in', ['done', 'cancel']),
+                    ('product_id.categ_id', 'child_of', categ_ids),
+                    ('user_id', '=', self.env.user.id),
+                ]
+
+        mos = self.env['mrp.production'].sudo().search(domain, order='date_start asc, id asc')
+
+        vals_list = [
+            {
+                'mo_id': mo.id,
+                'qty_producing': min(mo.qty_producing or mo.product_qty, mo.product_qty),
+            }
+            for mo in mos
+        ]
+        if vals_list:
+            self.create(vals_list)
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Pending Production (Produce All)'),
+            'res_model': 'quick.production.list',
+            'view_mode': 'list',
+            'view_id': self.env.ref('quick_production.view_quick_production_list_tree').id,
+            'domain': [('create_uid', '=', self.env.uid)],
+            'target': 'current',
+        }
 
     def action_fill_planned_qty(self):
         """Sets qty_producing = qty_total on all selected lines."""
@@ -64,14 +105,10 @@ class QuickProductionList(models.TransientModel):
         }
 
     def action_cancel(self):
-        """Cancels the Manufacturing Order."""
+        """Cancels the Manufacturing Order and refreshes the list."""
         self.ensure_one()
         self.mo_id.action_cancel()
-        self.unlink()
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'reload',
-        }
+        return self.action_open_bulk_production()
 
     def action_produce_line(self):
         """Produces a single line."""
@@ -84,7 +121,7 @@ class QuickProductionList(models.TransientModel):
                   prod=self.qty_producing, plan=self.qty_total)
             )
         self._complete_mo(self.mo_id, self.qty_producing)
-        return self.env.ref('quick_production.action_open_bulk_production')._run_action_code_multi()
+        return self.action_open_bulk_production()
 
     def action_produce_selected(self):
         """Produces all selected lines with positive quantity."""
@@ -102,7 +139,7 @@ class QuickProductionList(models.TransientModel):
         if produced_count == 0:
             raise UserError(_("Please enter a positive quantity on at least one selected order."))
 
-        return self.env.ref('quick_production.action_open_bulk_production')._run_action_code_multi()
+        return self.action_open_bulk_production()
 
     @api.model
     def _complete_mo(self, mo, qty):
@@ -119,10 +156,11 @@ class QuickProductionList(models.TransientModel):
                     move.quantity = move.product_uom_qty * factor
                     move.picked = True
 
-        res = mo.with_context(skip_Expired=True).button_mark_done()
+        res = mo.with_context(skip_expired=True).button_mark_done()
 
-        # Handle wizards returned by button_mark_done (Backorder, Immediate, Consumption Warning)
-        while isinstance(res, dict) and res.get('res_model'):
+        for _ in range(5):
+            if not (isinstance(res, dict) and res.get('res_model')):
+                break
             res_model = res['res_model']
             ctx = res.get('context', {})
             if res_model == 'mrp.production.backorder':

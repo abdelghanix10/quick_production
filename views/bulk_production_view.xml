@@ -55,39 +55,7 @@
         <field name="model_id" ref="model_quick_production_list"/>
         <field name="state">code</field>
         <field name="code">
-# Clear only current user's transient rows to prevent multi-user collisions
-env['quick.production.list'].search([('create_uid', '=', env.uid)]).unlink()
-
-if env.user.has_group('base.group_system'):
-    domain = [('state', 'not in', ['done', 'cancel'])]
-else:
-    categ_ids = env.user._get_allowed_production_category_ids()
-    if not categ_ids:
-        domain = [('id', '=', False)]
-    else:
-        domain = [
-            ('state', 'not in', ['done', 'cancel']),
-            ('product_id.categ_id', 'child_of', categ_ids),
-            ('user_id', '=', env.user.id),
-        ]
-
-mos = env['mrp.production'].sudo().search(domain, order='date_start asc, id asc')
-
-for mo in mos:
-    env['quick.production.list'].create({
-        'mo_id': mo.id,
-        'qty_producing': mo.qty_producing or mo.product_qty,
-    })
-
-action = {
-    'type': 'ir.actions.act_window',
-    'name': 'Pending Production (Produce All)',
-    'res_model': 'quick.production.list',
-    'view_mode': 'list',
-    'view_id': env.ref('quick_production.view_quick_production_list_tree').id,
-    'domain': [('create_uid', '=', env.uid)],
-    'target': 'current',
-}
+action = model.action_open_bulk_production()
         </field>
     </record>
 

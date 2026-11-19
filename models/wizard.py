@@ -50,16 +50,17 @@ class QuickProductionWizard(models.TransientModel):
             for bom_line, line_data in lines_done:
                 comp = bom_line.product_id
                 req_qty = line_data['qty']
+                # In Odoo 20, mrp.bom.line uses `uom_id`
+                line_uom = bom_line.uom_id if 'uom_id' in bom_line._fields else bom_line.product_uom_id
                 commands.append(fields.Command.create({
                     'product_id': comp.id,
                     'qty': req_qty,
                     'qty_available': comp.qty_available,
-                    'uom_id': bom_line.product_uom_id.id,
+                    'uom_id': line_uom.id,
                 }))
 
         self.ingredient_ids = commands
 
-    # Quick Kiosk Quantity Increment Buttons
     def _reopen_wizard(self):
         self._onchange_qty_producing()
         return {
@@ -101,7 +102,7 @@ class QuickProductionWizard(models.TransientModel):
         mo_vals = {
             'product_id': self.product_id.id,
             'product_qty': self.qty_producing,
-            'product_uom_id': self.product_id.uom_id.id,
+            'uom_id': self.product_id.uom_id.id,
             'bom_id': bom.id if bom else False,
             'user_id': self.env.uid,
         }
@@ -191,11 +192,13 @@ class QuickProductionEditWizard(models.TransientModel):
             lines = []
             for move in mo.move_raw_ids.filtered(lambda m: m.state not in ('done', 'cancel')):
                 qty_per_unit = move.product_uom_qty / mo.product_qty if mo.product_qty else 0.0
+                # In Odoo 20, stock.move uses `uom_id` instead of `product_uom`
+                move_uom = move.uom_id if 'uom_id' in move._fields else move.product_uom
                 lines.append(fields.Command.create({
                     'product_id': move.product_id.id,
                     'qty_per_unit': qty_per_unit,
                     'qty': move.product_uom_qty,
-                    'uom_id': move.product_uom.id,
+                    'uom_id': move_uom.id,
                     'move_id': move.id,
                 }))
             res['line_ids'] = lines
